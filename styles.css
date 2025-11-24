@@ -1,0 +1,8 @@
+/* Estilos adicionales para la extensión (si se necesitan fuera del Shadow DOM) */
+/* Los estilos principales están en content.js dentro del Shadow DOM para aislamiento */
+
+#page-navigator-container {
+  /* Contenedor principal - estilos mínimos ya que usa Shadow DOM */
+  all: initial;
+}
+

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generador de Iconos para Extensión</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px 5px;
+            background: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #357abd;
+        }
+    </style>
+</head>
+<body>
+    <h1>Generador de Iconos para Extensión Chrome</h1>
+    <p>Haz clic en "Generar Iconos" para crear los iconos necesarios. Luego haz clic derecho en cada canvas y "Guardar imagen como..." para guardarlos como PNG.</p>
+    
+    <button onclick="generateIcons()">Generar Iconos</button>
+    
+    <div id="canvases"></div>
+
+    <script>
+        function generateIcons() {
+            const sizes = [16, 48, 128];
+            const container = document.getElementById('canvases');
+            container.innerHTML = '';
+
+            sizes.forEach(size => {
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                canvas.id = `icon${size}`;
+                canvas.style.display = 'block';
+                canvas.style.margin = '10px auto';
+
+                const ctx = canvas.getContext('2d');
+                
+                // Fondo
+                ctx.fillStyle = '#4a90e2';
+                ctx.fillRect(0, 0, size, size);
+                
+                // Borde redondeado (simulado)
+                ctx.fillStyle = '#357abd';
+                ctx.beginPath();
+                ctx.arc(size/2, size/2, size/2 - 2, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // Texto "P" o números según el tamaño
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${size * 0.6}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                if (size >= 48) {
+                    ctx.fillText('P', size/2, size/2);
+                } else {
+                    ctx.fillText('P', size/2, size/2);
+                }
+
+                const label = document.createElement('div');
+                label.textContent = `${size}x${size} - Haz clic derecho para guardar como icon${size}.png`;
+                label.style.textAlign = 'center';
+                label.style.marginBottom = '20px';
+
+                container.appendChild(label);
+                container.appendChild(canvas);
+            });
+        }
+    </script>
+</body>
+</html>
+

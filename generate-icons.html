@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generador y Descargador de Iconos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #4a90e2;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        canvas {
+            border: 2px solid #ddd;
+            margin: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 12px 24px;
+            margin: 10px 5px;
+            background: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #357abd;
+        }
+        button.secondary {
+            background: #28a745;
+        }
+        button.secondary:hover {
+            background: #218838;
+        }
+        .icon-preview {
+            display: inline-block;
+            margin: 20px;
+            text-align: center;
+            vertical-align: top;
+        }
+        .icon-preview h3 {
+            margin: 10px 0;
+            color: #333;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+            color: #155724;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Generador de Iconos para Extensión Chrome</h1>
+        <p class="subtitle">Genera y descarga automáticamente los iconos necesarios para tu extensión</p>
+        
+        <button onclick="generateAndDownloadAll()">✨ Generar y Descargar Todos los Iconos</button>
+        <button class="secondary" onclick="generateIcons()">👁️ Solo Previsualizar</button>
+        
+        <div id="status"></div>
+        <div id="canvases"></div>
+    </div>
+
+    <script>
+        function generateIcon(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Fondo con gradiente
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#4a90e2');
+            gradient.addColorStop(1, '#357abd');
+            ctx.fillStyle = gradient;
+            
+            // Dibujar círculo con borde
+            const margin = Math.max(1, size / 16);
+            ctx.beginPath();
+            ctx.arc(size/2, size/2, size/2 - margin, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Borde exterior
+            ctx.strokeStyle = '#2a5a8a';
+            ctx.lineWidth = Math.max(1, size / 32);
+            ctx.stroke();
+
+            if (size >= 48) {
+                // Para iconos grandes: dibujar páginas apiladas
+                const pageWidth = size / 3;
+                const pageHeight = size / 4;
+                const offset = size / 12;
+                
+                // Sombra de la página de atrás
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.fillRect(size/2 - pageWidth/2 + offset + 2, size/2 - pageHeight/2 + offset + 2, pageWidth, pageHeight);
+                
+                // Página de atrás
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.fillRect(size/2 - pageWidth/2 + offset, size/2 - pageHeight/2 + offset, pageWidth, pageHeight);
+                ctx.strokeStyle = '#ccc';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(size/2 - pageWidth/2 + offset, size/2 - pageHeight/2 + offset, pageWidth, pageHeight);
+                
+                // Página del medio (activa)
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(size/2 - pageWidth/2, size/2 - pageHeight/2, pageWidth, pageHeight);
+                ctx.strokeStyle = '#999';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(size/2 - pageWidth/2, size/2 - pageHeight/2, pageWidth, pageHeight);
+                
+                // Líneas de texto simuladas
+                ctx.strokeStyle = '#666';
+                ctx.lineWidth = 1;
+                const lineWidth = pageWidth * 0.6;
+                const lineY1 = size/2 - pageHeight/6;
+                const lineY2 = size/2;
+                const lineY3 = size/2 + pageHeight/6;
+                
+                ctx.beginPath();
+                ctx.moveTo(size/2 - lineWidth/2, lineY1);
+                ctx.lineTo(size/2 + lineWidth/2, lineY1);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(size/2 - lineWidth/2, lineY2);
+                ctx.lineTo(size/2 + lineWidth/2, lineY2);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(size/2 - lineWidth/2, lineY3);
+                ctx.lineTo(size/2 + lineWidth/2 * 0.7, lineY3);
+                ctx.stroke();
+            } else {
+                // Para iconos pequeños: mostrar "P" estilizada
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${size * 0.65}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('P', size/2, size/2);
+            }
+
+            return canvas;
+        }
+
+        function downloadCanvas(canvas, filename) {
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        function generateIcons() {
+            const sizes = [16, 48, 128];
+            const container = document.getElementById('canvases');
+            container.innerHTML = '';
+
+            sizes.forEach(size => {
+                const iconDiv = document.createElement('div');
+                iconDiv.className = 'icon-preview';
+                
+                const h3 = document.createElement('h3');
+                h3.textContent = `${size}x${size} pixels`;
+                iconDiv.appendChild(h3);
+
+                const canvas = generateIcon(size);
+                iconDiv.appendChild(canvas);
+
+                const downloadBtn = document.createElement('button');
+                downloadBtn.textContent = `⬇️ Descargar icon${size}.png`;
+                downloadBtn.onclick = () => downloadCanvas(canvas, `icon${size}.png`);
+                downloadBtn.style.marginTop = '10px';
+                iconDiv.appendChild(downloadBtn);
+
+                container.appendChild(iconDiv);
+            });
+        }
+
+        function generateAndDownloadAll() {
+            const sizes = [16, 48, 128];
+            const status = document.getElementById('status');
+            status.style.display = 'block';
+            status.textContent = 'Generando iconos...';
+            status.style.background = '#fff3cd';
+            status.style.borderColor = '#ffc107';
+            status.style.color = '#856404';
+
+            let downloaded = 0;
+            sizes.forEach((size, index) => {
+                setTimeout(() => {
+                    const canvas = generateIcon(size);
+                    downloadCanvas(canvas, `icon${size}.png`);
+                    downloaded++;
+                    
+                    if (downloaded === sizes.length) {
+                        status.style.background = '#d4edda';
+                        status.style.borderColor = '#c3e6cb';
+                        status.style.color = '#155724';
+                        status.textContent = `✅ ¡Todos los iconos han sido descargados exitosamente! (${downloaded}/${sizes.length})`;
+                        
+                        // Mostrar previsualización
+                        generateIcons();
+                    } else {
+                        status.textContent = `Descargando... (${downloaded}/${sizes.length})`;
+                    }
+                }, index * 500); // Espaciar descargas
+            });
+        }
+
+        // Generar previsualización al cargar
+        window.onload = function() {
+            generateIcons();
+        };
+    </script>
+</body>
+</html>
+
