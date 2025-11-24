@@ -168,19 +168,55 @@
 
     // Si no se detectó totalPages, intentar estimarlo desde la URL actual
     if (info.totalPages === 1 && info.currentPage > 1) {
-      info.totalPages = info.currentPage + 5; // Estimación conservadora
+      info.totalPages = info.currentPage + 10; // Estimación más generosa
+    }
+
+    // Si hay pageLinks pero totalPages es 1, usar el máximo de los links
+    if (info.totalPages === 1 && info.pageLinks.length > 0) {
+      const maxPageFromLinks = Math.max(...info.pageLinks.map(l => l.page));
+      if (maxPageFromLinks > 1) {
+        info.totalPages = maxPageFromLinks;
+      }
     }
 
     // Validar que tenemos información suficiente
-    // Solo mostrar si hay más de una página o si hay links de página detectados
-    if (info.totalPages > 1 || (info.currentPage > 1 && info.totalPages >= info.currentPage) || info.pageLinks.length > 0) {
+    // Mostrar si hay links de página detectados, o si hay parámetros de URL, o si currentPage > 1
+    const hasPageLinks = info.pageLinks.length > 0;
+    const hasUrlParam = info.urlPattern !== null;
+    const hasMultiplePages = info.totalPages > 1;
+    const isNotFirstPage = info.currentPage > 1;
+
+    if (hasPageLinks || hasUrlParam || hasMultiplePages || isNotFirstPage) {
       // Asegurar que totalPages sea al menos igual a currentPage
       if (info.totalPages < info.currentPage) {
-        info.totalPages = info.currentPage + 5; // Estimación si no se detectó
+        // Si hay pageLinks, usar el máximo de ellos
+        if (info.pageLinks.length > 0) {
+          const maxPageFromLinks = Math.max(...info.pageLinks.map(l => l.page));
+          info.totalPages = Math.max(maxPageFromLinks, info.currentPage + 5);
+        } else {
+          info.totalPages = info.currentPage + 5; // Estimación si no se detectó
+        }
       }
+
+      // Si totalPages es 1 pero hay pageLinks, actualizar
+      if (info.totalPages === 1 && info.pageLinks.length > 0) {
+        const maxPageFromLinks = Math.max(...info.pageLinks.map(l => l.page));
+        if (maxPageFromLinks > 1) {
+          info.totalPages = maxPageFromLinks;
+        }
+      }
+
+      console.log('[PageNavigator] Paginador detectado:', {
+        currentPage: info.currentPage,
+        totalPages: info.totalPages,
+        pageLinks: info.pageLinks.length,
+        urlPattern: info.urlPattern
+      });
+
       return info;
     }
 
+    console.log('[PageNavigator] No se detectó paginador');
     return null;
   }
 
@@ -194,7 +230,7 @@
     // Crear contenedor con Shadow DOM para aislamiento
     const container = document.createElement('div');
     container.id = 'page-navigator-container';
-    const shadow = container.attachShadow({ mode: 'closed' });
+    const shadow = container.attachShadow({ mode: 'open' });
 
     // Crear estructura HTML
     const wrapper = document.createElement('div');
@@ -273,18 +309,56 @@
 
   // Actualizar botones de página
   function updatePageButtons() {
-    if (!floatingBar) return;
+    if (!floatingBar) {
+      console.log('[PageNavigator] No hay floatingBar');
+      return;
+    }
 
     const shadow = floatingBar.shadowRoot;
+    if (!shadow) {
+      console.log('[PageNavigator] No hay shadowRoot');
+      return;
+    }
+
     const buttonsContainer = shadow.querySelector('#page-buttons-container');
-    if (!buttonsContainer) return;
+    if (!buttonsContainer) {
+      console.log('[PageNavigator] No se encontró buttonsContainer');
+      return;
+    }
 
     // Limpiar botones existentes
     buttonsContainer.innerHTML = '';
 
+    // Si totalPages es 1 pero tenemos pageLinks, estimar más páginas
+    if (totalPages === 1 && paginatorInfo && paginatorInfo.pageLinks.length > 0) {
+      const maxPageFromLinks = Math.max(...paginatorInfo.pageLinks.map(l => l.page));
+      if (maxPageFromLinks > totalPages) {
+        totalPages = maxPageFromLinks;
+      }
+    }
+
+    // Si aún es 1, pero currentPage > 1, estimar totalPages
+    if (totalPages === 1 && currentPage > 1) {
+      totalPages = currentPage + range; // Estimación conservadora
+    }
+
+    // Si totalPages sigue siendo 1, crear al menos un botón para la página actual
+    if (totalPages === 1 && currentPage === 1) {
+      const button = document.createElement('button');
+      button.className = 'page-navigator-button active';
+      button.textContent = '1';
+      button.title = 'Página actual';
+      button.disabled = true;
+      buttonsContainer.appendChild(button);
+      console.log('[PageNavigator] Solo una página detectada, mostrando página 1');
+      return;
+    }
+
     // Calcular rango de páginas a mostrar
     const startPage = Math.max(1, currentPage - range);
     const endPage = Math.min(totalPages, currentPage + range);
+
+    console.log(`[PageNavigator] Actualizando botones: página ${currentPage} de ${totalPages}, rango ${startPage}-${endPage}`);
 
     // Crear botones
     for (let page = startPage; page <= endPage; page++) {
@@ -322,6 +396,8 @@
       lastBtn.addEventListener('click', () => navigateToPage(totalPages));
       buttonsContainer.appendChild(lastBtn);
     }
+
+    console.log(`[PageNavigator] Botones creados: ${buttonsContainer.children.length}`);
   }
 
   // Navegar a una página específica
