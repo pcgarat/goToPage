@@ -329,34 +329,57 @@
     // Limpiar botones existentes
     buttonsContainer.innerHTML = '';
 
-    // Si totalPages es 1 pero tenemos pageLinks, estimar más páginas
+    // Re-detectar paginador para asegurar datos actualizados
+    const freshInfo = detectPaginator();
+    if (freshInfo) {
+      currentPage = freshInfo.currentPage;
+      totalPages = freshInfo.totalPages;
+      paginatorInfo = freshInfo;
+    }
+
+    // Si totalPages es 1 pero tenemos pageLinks, usar el máximo de los links
     if (totalPages === 1 && paginatorInfo && paginatorInfo.pageLinks.length > 0) {
       const maxPageFromLinks = Math.max(...paginatorInfo.pageLinks.map(l => l.page));
       if (maxPageFromLinks > totalPages) {
         totalPages = maxPageFromLinks;
+        console.log(`[PageNavigator] totalPages actualizado desde pageLinks: ${totalPages}`);
       }
     }
 
-    // Si aún es 1, pero currentPage > 1, estimar totalPages
-    if (totalPages === 1 && currentPage > 1) {
-      totalPages = currentPage + range; // Estimación conservadora
+    // Si totalPages es muy bajo pero currentPage es mayor, estimar mejor
+    if (totalPages < currentPage + range) {
+      // Si hay pageLinks, usar el máximo
+      if (paginatorInfo && paginatorInfo.pageLinks.length > 0) {
+        const maxPageFromLinks = Math.max(...paginatorInfo.pageLinks.map(l => l.page));
+        if (maxPageFromLinks > totalPages) {
+          totalPages = maxPageFromLinks;
+        }
+      }
+      // Si aún es bajo, estimar generosamente
+      if (totalPages < currentPage + range) {
+        totalPages = currentPage + range + 5; // Estimación generosa
+        console.log(`[PageNavigator] totalPages estimado: ${totalPages}`);
+      }
     }
 
-    // Si totalPages sigue siendo 1, crear al menos un botón para la página actual
+    // Si totalPages sigue siendo 1 y currentPage es 1, puede que realmente sea solo una página
+    // Pero aún así, mostrar el rango solicitado por si hay más páginas
     if (totalPages === 1 && currentPage === 1) {
-      const button = document.createElement('button');
-      button.className = 'page-navigator-button active';
-      button.textContent = '1';
-      button.title = 'Página actual';
-      button.disabled = true;
-      buttonsContainer.appendChild(button);
-      console.log('[PageNavigator] Solo una página detectada, mostrando página 1');
-      return;
+      // Asumir que puede haber más páginas y mostrar el rango
+      totalPages = currentPage + range;
+      console.log(`[PageNavigator] totalPages asumido para mostrar rango: ${totalPages}`);
     }
 
     // Calcular rango de páginas a mostrar
+    // SIEMPRE mostrar currentPage ± range, sin limitar por totalPages detectado
+    // El usuario puede navegar a páginas que aún no hemos detectado
     const startPage = Math.max(1, currentPage - range);
-    const endPage = Math.min(totalPages, currentPage + range);
+    const endPage = currentPage + range;
+    
+    // NO limitar por totalPages - siempre mostrar el rango completo
+    // Si el usuario hace clic en una página que no existe, la navegación fallará naturalmente
+    
+    console.log(`[PageNavigator] Rango calculado: ${startPage} a ${endPage} (página actual: ${currentPage}, total detectado: ${totalPages})`);
 
     console.log(`[PageNavigator] Actualizando botones: página ${currentPage} de ${totalPages}, rango ${startPage}-${endPage}`);
 
@@ -370,7 +393,10 @@
       button.textContent = page;
       button.title = `Ir a página ${page}`;
 
-      button.addEventListener('click', () => {
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log(`[PageNavigator] Botón de página ${page} clickeado`);
         navigateToPage(page);
       });
 
@@ -383,17 +409,28 @@
       firstBtn.className = 'page-navigator-button page-navigator-special';
       firstBtn.textContent = '1';
       firstBtn.title = 'Ir a primera página';
-      firstBtn.addEventListener('click', () => navigateToPage(1));
+      firstBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[PageNavigator] Botón primera página clickeado');
+        navigateToPage(1);
+      });
       buttonsContainer.insertBefore(firstBtn, buttonsContainer.firstChild);
     }
 
-    // Botón para última página si no está visible
-    if (endPage < totalPages) {
+    // Botón para última página si no está visible y sabemos cuál es
+    // Solo mostrar si totalPages está bien detectado (mayor que endPage)
+    if (totalPages > endPage && totalPages > 1) {
       const lastBtn = document.createElement('button');
       lastBtn.className = 'page-navigator-button page-navigator-special';
       lastBtn.textContent = totalPages;
       lastBtn.title = `Ir a última página (${totalPages})`;
-      lastBtn.addEventListener('click', () => navigateToPage(totalPages));
+      lastBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log(`[PageNavigator] Botón última página (${totalPages}) clickeado`);
+        navigateToPage(totalPages);
+      });
       buttonsContainer.appendChild(lastBtn);
     }
 
@@ -402,22 +439,39 @@
 
   // Navegar a una página específica
   function navigateToPage(page) {
-    if (page < 1 || page > totalPages || page === currentPage) return;
+    console.log(`[PageNavigator] Navegando a página ${page}`);
+    
+    if (page < 1 || page > totalPages || page === currentPage) {
+      console.log(`[PageNavigator] Navegación cancelada: página inválida o igual a actual`);
+      return;
+    }
 
     // Intentar encontrar link existente en el paginador
     if (paginatorInfo && paginatorInfo.pageLinks.length > 0) {
       const link = paginatorInfo.pageLinks.find(l => l.page === page);
       if (link && link.element) {
+        console.log(`[PageNavigator] Usando link existente para página ${page}`);
         link.element.click();
+        // Re-detectaremos después de que la página cargue
+        setTimeout(() => {
+          const newInfo = detectPaginator();
+          if (newInfo) {
+            currentPage = newInfo.currentPage;
+            totalPages = newInfo.totalPages;
+            paginatorInfo = newInfo;
+            updatePageButtons();
+          }
+        }, 1000);
         return;
       }
     }
 
     // Si no hay link, modificar la URL
+    let targetUrl;
     if (paginatorInfo && paginatorInfo.urlPattern) {
       const url = new URL(window.location.href);
       url.searchParams.set(paginatorInfo.urlPattern.param, page.toString());
-      window.location.href = url.toString();
+      targetUrl = url.toString();
     } else {
       // Intentar detectar patrón de URL
       const currentUrl = window.location.href;
@@ -439,8 +493,11 @@
         url.searchParams.set('page', page.toString());
       }
       
-      window.location.href = url.toString();
+      targetUrl = url.toString();
     }
+
+    console.log(`[PageNavigator] Navegando a: ${targetUrl}`);
+    window.location.href = targetUrl;
   }
 
   // Observar cambios en el DOM
@@ -449,26 +506,66 @@
       observer.disconnect();
     }
 
+    let debounceTimer;
     observer = new MutationObserver(() => {
-      // Re-detectar paginador si cambia el DOM
-      const newInfo = detectPaginator();
-      if (newInfo) {
-        const pageChanged = newInfo.currentPage !== currentPage;
-        currentPage = newInfo.currentPage;
-        totalPages = newInfo.totalPages;
-        paginatorInfo = newInfo;
-        
-        if (pageChanged) {
-          updatePageButtons();
+      // Debounce para evitar demasiadas actualizaciones
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        // Re-detectar paginador si cambia el DOM
+        const newInfo = detectPaginator();
+        if (newInfo) {
+          const pageChanged = newInfo.currentPage !== currentPage;
+          const totalChanged = newInfo.totalPages !== totalPages;
+          
+          currentPage = newInfo.currentPage;
+          totalPages = newInfo.totalPages;
+          paginatorInfo = newInfo;
+          
+          if (pageChanged || totalChanged) {
+            console.log(`[PageNavigator] Cambio detectado: página ${currentPage} de ${totalPages}`);
+            updatePageButtons();
+          }
         }
-      }
+      }, 300);
     });
 
     observer.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'aria-current']
+      attributeFilter: ['class', 'aria-current', 'href']
+    });
+
+    // También escuchar cambios en la URL (navegación del navegador)
+    window.addEventListener('popstate', () => {
+      console.log('[PageNavigator] Cambio de URL detectado (popstate)');
+      setTimeout(() => {
+        const newInfo = detectPaginator();
+        if (newInfo) {
+          currentPage = newInfo.currentPage;
+          totalPages = newInfo.totalPages;
+          paginatorInfo = newInfo;
+          updatePageButtons();
+        }
+      }, 500);
+    });
+
+    // Escuchar cuando la página se carga completamente
+    window.addEventListener('load', () => {
+      console.log('[PageNavigator] Página cargada completamente');
+      setTimeout(() => {
+        const newInfo = detectPaginator();
+        if (newInfo) {
+          currentPage = newInfo.currentPage;
+          totalPages = newInfo.totalPages;
+          paginatorInfo = newInfo;
+          if (floatingBar) {
+            updatePageButtons();
+          } else {
+            createFloatingBar();
+          }
+        }
+      }, 1000);
     });
   }
 
